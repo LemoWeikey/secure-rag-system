@@ -3,7 +3,7 @@
       "builder": "nixpacks"
     },
     "deploy": {
-      "startCommand": "python app.py",
+      "startCommand": "python flask_app.py",
       "healthcheckPath": "/",
       "healthcheckTimeout": 300,
       "restartPolicyType": "always"
