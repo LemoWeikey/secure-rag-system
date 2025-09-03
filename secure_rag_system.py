@@ -487,34 +487,34 @@ class ActiveLoopRAG:
             return []
 
     # --- Add documents ---
-    def add_document(self, text: str, department: str, file_id: int, filename: str):
-        # if department not in self.vector_stores:
-        #     print(f"[ERROR] Department {department} not found")
-        #     return
+    # def add_document(self, text: str, department: str, file_id: int, filename: str):
+    #     # if department not in self.vector_stores:
+    #     #     print(f"[ERROR] Department {department} not found")
+    #     #     return
         
-        # embedding = self.get_embedding(text)
-        # if not embedding:
-        #     return
+    #     # embedding = self.get_embedding(text)
+    #     # if not embedding:
+    #     #     return
         
-        # metadata = {
-        #     "file_id": file_id,
-        #     "filename": filename,
-        #     "department": department,
-        #     "timestamp": datetime.now().isoformat()
-        # }
+    #     # metadata = {
+    #     #     "file_id": file_id,
+    #     #     "filename": filename,
+    #     #     "department": department,
+    #     #     "timestamp": datetime.now().isoformat()
+    #     # }
         
-        # try:
-        #     with self.vector_stores[department]:
-        #         self.vector_stores[department].append({
-        #             "text": text,
-        #             "embedding": embedding,
-        #             "metadata": metadata
-        #         })
-        #     print(f"[DEBUG] Added document '{filename}' to {department}")
-        # except Exception as e:
-        #     print(f"[ERROR] Failed to add document: {e}")
-        print("[INFO] add_document disabled — uploads are stored only in Postgres/SQLite.")
-        return []
+    #     # try:
+    #     #     with self.vector_stores[department]:
+    #     #         self.vector_stores[department].append({
+    #     #             "text": text,
+    #     #             "embedding": embedding,
+    #     #             "metadata": metadata
+    #     #         })
+    #     #     print(f"[DEBUG] Added document '{filename}' to {department}")
+    #     # except Exception as e:
+    #     #     print(f"[ERROR] Failed to add document: {e}")
+    #     print("[INFO] add_document disabled — uploads are stored only in Postgres/SQLite.")
+    #     return []
     # --- Search ---
     def search_department(self, query: str, department: str, k: int = 5) -> List[SearchResult]:
         if department not in self.vector_stores:
@@ -635,7 +635,30 @@ class SecureRAGSystem:
             }
         return {"success": False, "error": "Thông tin đăng nhập không hợp lệ"}
     
-    def upload_file(self, token: str, file_content: bytes, filename: str, text_content: str) -> Dict:
+    # def upload_file(self, token: str, file_content: bytes, filename: str, text_content: str) -> Dict:
+    #     """Upload file (only saves in Postgres + SQLite, not DeepLake)."""
+    #     payload = self.security_manager.verify_token(token)
+    #     if not payload:
+    #         return {"success": False, "error": "Token không hợp lệ"}
+        
+    #     department = payload['department']
+    #     username = payload['username']
+        
+    #     try:
+    #         # Save file only
+    #         file_id = self.file_manager.save_file(file_content, filename, department, username)
+            
+    #         # No DeepLake push
+    #         return {
+    #             "success": True,
+    #             "file_id": file_id,
+    #             "message": f"Tải file '{filename}' thành công vào phòng ban {department}"
+    #         }
+    #     except Exception as e:
+    #         return {"success": False, "error": f"Lỗi: {str(e)}"}
+
+    
+    def upload_file(self, token: str, file_content: bytes, filename: str, text_content: Optional[str] = None) -> Dict:
         """Upload file (only saves in Postgres + SQLite, not DeepLake)."""
         payload = self.security_manager.verify_token(token)
         if not payload:
@@ -645,10 +668,10 @@ class SecureRAGSystem:
         username = payload['username']
         
         try:
-            # Save file only
+            # Save file only (text_content is ignored since we don't use it)
             file_id = self.file_manager.save_file(file_content, filename, department, username)
             
-            # No DeepLake push
+            # No DeepLake push - search uses pre-existing vectors
             return {
                 "success": True,
                 "file_id": file_id,
@@ -656,8 +679,6 @@ class SecureRAGSystem:
             }
         except Exception as e:
             return {"success": False, "error": f"Lỗi: {str(e)}"}
-
-    
     def search(self, token: str, query: str) -> Dict:
         payload = self.security_manager.verify_token(token)
         if not payload:

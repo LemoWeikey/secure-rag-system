@@ -98,31 +98,31 @@ def download_file(file_id):
     )
 
 # Helper function to extract text from files
-def extract_text_from_file(file_content, filename):
-    """Extract text content from uploaded files"""
-    file_extension = filename.lower().split('.')[-1]
+# def extract_text_from_file(file_content, filename):
+#     """Extract text content from uploaded files"""
+#     file_extension = filename.lower().split('.')[-1]
     
-    if file_extension == 'txt':
-        return file_content.decode('utf-8', errors='ignore')
+#     if file_extension == 'txt':
+#         return file_content.decode('utf-8', errors='ignore')
     
-    elif file_extension == 'pdf':
-        try:
-            pdf_reader = PyPDF2.PdfReader(BytesIO(file_content))
-            text = ""
-            for page in pdf_reader.pages:
-                text += page.extract_text()
-            return text
-        except Exception as e:
-            raise Exception(f"Lỗi đọc file PDF: {str(e)}")
+#     elif file_extension == 'pdf':
+#         try:
+#             pdf_reader = PyPDF2.PdfReader(BytesIO(file_content))
+#             text = ""
+#             for page in pdf_reader.pages:
+#                 text += page.extract_text()
+#             return text
+#         except Exception as e:
+#             raise Exception(f"Lỗi đọc file PDF: {str(e)}")
     
-    elif file_extension == 'docx':
-        try:
-            return docx2txt.process(BytesIO(file_content))
-        except Exception as e:
-            raise Exception(f"Lỗi đọc file DOCX: {str(e)}")
+#     elif file_extension == 'docx':
+#         try:
+#             return docx2txt.process(BytesIO(file_content))
+#         except Exception as e:
+#             raise Exception(f"Lỗi đọc file DOCX: {str(e)}")
     
-    else:
-        raise Exception(f"Loại file không được hỗ trợ: {file_extension}")
+#     else:
+#         raise Exception(f"Loại file không được hỗ trợ: {file_extension}")
 
 # Routes
 @app.route('/')
@@ -151,6 +151,40 @@ def login():
     else:
         return jsonify(result), 401
 
+# @app.route('/api/upload', methods=['POST'])
+# def upload_file():
+#     # Get token from Authorization header or session
+#     auth_header = request.headers.get('Authorization')
+#     if auth_header and auth_header.startswith('Bearer '):
+#         token = auth_header.split(' ')[1]
+#     else:
+#         token = session.get("token")
+    
+#     if not token:
+#         return jsonify({"success": False, "error": "Token xác thực là bắt buộc"}), 401
+    
+#     if 'file' not in request.files:
+#         return jsonify({"success": False, "error": "Chưa có file được cung cấp"}), 400
+    
+#     file = request.files['file']
+#     if file.filename == '':
+#         return jsonify({"success": False, "error": "Chưa chọn file"}), 400
+    
+#     try:
+#         file_content = file.read()
+#         filename = secure_filename(file.filename)
+        
+#         text_content = extract_text_from_file(file_content, filename)
+        
+#         if not text_content.strip():
+#             return jsonify({"success": False, "error": "Không tìm thấy nội dung văn bản trong file"}), 400
+        
+#         result = rag_system.upload_file(token, file_content, filename, text_content)
+        
+#         return jsonify(result), 200 if result["success"] else 400
+        
+#     except Exception as e:
+#         return jsonify({"success": False, "error": str(e)}), 500
 @app.route('/api/upload', methods=['POST'])
 def upload_file():
     # Get token from Authorization header or session
@@ -174,12 +208,8 @@ def upload_file():
         file_content = file.read()
         filename = secure_filename(file.filename)
         
-        text_content = extract_text_from_file(file_content, filename)
-        
-        if not text_content.strip():
-            return jsonify({"success": False, "error": "Không tìm thấy nội dung văn bản trong file"}), 400
-        
-        result = rag_system.upload_file(token, file_content, filename, text_content)
+        # Store file directly without text extraction
+        result = rag_system.upload_file(token, file_content, filename, text_content=None)
         
         return jsonify(result), 200 if result["success"] else 400
         
@@ -291,14 +321,32 @@ def approve_delete():
     
     result = rag_system.approve_file_deletion(token, request_id)
     return jsonify(result), 200 if result["success"] else 400
-
+@app.route('/api/admin/create-user', methods=['POST'])
+def create_department_user():
+    # Verify admin token
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    payload = rag_system.security_manager.verify_token(token)
+    
+    if not payload or payload.get('role') != 'admin':
+        return jsonify({"success": False, "error": "Admin access required"}), 403
+    
+    data = request.get_json()
+    try:
+        rag_system.security_manager.register_user(
+            data['username'],
+            data['department'], 
+            data['password'],
+            UserRole.DEPARTMENT_USER
+        )
+        return jsonify({"success": True, "message": "User created successfully"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
 # Create admin user setup (run once)
 def setup_admin_user():
-    """Setup initial admin user - run this once manually"""
+    """Setup initial admin user - run once on first deployment"""
     try:
-        # Create admin user with secure credentials
         admin_username = os.getenv("ADMIN_USERNAME", "admin")
-        admin_password = os.getenv("ADMIN_PASSWORD", "change_this_password_123!")
+        admin_password = os.getenv("ADMIN_PASSWORD", "ChangeThis123!")
         
         rag_system.security_manager.register_user(
             admin_username, 
@@ -306,25 +354,27 @@ def setup_admin_user():
             admin_password, 
             UserRole.ADMIN
         )
-        print(f"Admin user created: {admin_username}")
-        print("IMPORTANT: Change the admin password immediately!")
+        print(f"✅ Admin user created: {admin_username}")
+        print("⚠️  IMPORTANT: Change admin password after first login!")
         
     except Exception as e:
-        print(f"Admin user may already exist: {e}")
+        print(f"ℹ️  Admin user setup: {e}")
 
 if __name__ == '__main__':
+    # Create necessary directories
     os.makedirs("files", exist_ok=True)
     
-    # Only setup admin user if explicitly requested
-    if os.getenv("SETUP_ADMIN") == "true":
+    # Setup admin user if requested
+    if os.getenv("SETUP_ADMIN", "false").lower() == "true":
         setup_admin_user()
     
-    print("🚀 Khởi động SecureRAG System...")
-    print("📧 Liên hệ admin để nhận tài khoản truy cập")
-    
-    # Production settings
-    debug_mode = os.getenv("DEBUG", "false").lower() == "true"
-    port = int(os.getenv("PORT", 5000))
+    # Railway deployment settings
+    port = int(os.getenv("PORT", 8080))
     host = os.getenv("HOST", "0.0.0.0")
+    debug = os.getenv("DEBUG", "false").lower() == "true"
     
-    app.run(debug=debug_mode, host=host, port=port)
+    print("🚀 Starting SecureRAG on Railway...")
+    print(f"🌐 Server: {host}:{port}")
+    print("📧 Contact admin for account access")
+    
+    app.run(host=host, port=port, debug=debug)
