@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureRAG - Bảng điều khiển</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f8fafc;
+            color: #1a202c;
+            line-height: 1.6;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 0;
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.15);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+        }
+
+        .logo {
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+        }
+
+        .logo i {
+            font-size: 24px;
+        }
+
+        .header-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .user-info {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-avatar {
+            width: 45px;
+            height: 45px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .logout-btn {
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .logout-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        /* Main Container */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        /* Grid Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .section {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e2e8f0;
+            transition: all 0.3s ease;
+        }
+
+        .section:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f1f5f9;
+        }
+
+        .section-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            font-size: 20px;
+            color: white;
+        }
+
+        .upload-icon { background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%); }
+        .files-icon { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); }
+        .search-icon { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
+        .admin-icon { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+
+        .section-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #374151;
+            font-size: 14px;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-input {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .file-input-display {
+            display: flex;
+            align-items: center;
+            padding: 15px 20px;
+            background: #f8fafc;
+            border: 2px dashed #cbd5e0;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .file-input-display:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .file-input-display.has-file {
+            border-color: #22c55e;
+            background: #f0fdf4;
+        }
+
+        .file-input-icon {
+            margin-right: 10px;
+            font-size: 20px;
+            color: #6b7280;
+        }
+
+        .file-input-text {
+            flex: 1;
+            color: #4b5563;
+            font-weight: 500;
+        }
+
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 15px 18px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: #fafbfc;
+        }
+
+        input[type="text"]:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .btn-success:hover {
+            box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            box-shadow: 0 10px 20px rgba(245, 158, 11, 0.3);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            box-shadow: 0 10px 20px rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-outline {
+            background: white;
+            border: 2px solid #e5e7eb;
+            color: #4b5563;
+        }
+
+        .btn-outline:hover {
+            background: #f9fafb;
+            border-color: #d1d5db;
+        }
+
+        /* Cards and Lists */
+        .file-grid {
+            display: grid;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .file-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .file-card:hover {
+            background: white;
+            border-color: #cbd5e0;
+            transform: translateX(5px);
+        }
+
+        .file-header {
+            display: flex;
+            justify-content: between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .file-info {
+            flex: 1;
+        }
+
+        .file-name {
+            font-weight: 700;
+            color: #1e293b;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+
+        .file-meta {
+            font-size: 13px;
+            color: #64748b;
+        }
+
+        .file-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .file-actions .btn {
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+
+        /* Search Results */
+        .search-results {
+            margin-top: 25px;
+            padding: 25px;
+            background: linear-gradient(135deg, #f0f4ff 0%, #e0e7ff 100%);
+            border-radius: 15px;
+            border: 1px solid #c7d2fe;
+        }
+
+        .search-response {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        .response-title {
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .response-content {
+            color: #374151;
+            line-height: 1.7;
+        }
+
+        .sources-section {
+            margin-top: 20px;
+        }
+
+        .sources-title {
+            font-weight: 600;
+            color: #4b5563;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .source-item {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #e5e7eb;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .source-info {
+            flex: 1;
+        }
+
+        .source-filename {
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .source-department {
+            font-size: 13px;
+            color: #6b7280;
+        }
+
+        .relevance-badge {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        /* Messages */
+        .message {
+            padding: 15px 20px;
+            border-radius: 12px;
+            margin-top: 15px;
+            font-weight: 500;
+            animation: slideIn 0.3s ease;
+        }
+
+        .message.error {
+            background: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+        }
+
+        .message.success {
+            background: #f0fdf4;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Admin Section */
+        .admin-section {
+            grid-column: 1 / -1;
+        }
+
+        .admin-requests {
+            display: grid;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .request-card {
+            background: #fef3c7;
+            border: 1px solid #fcd34d;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .request-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+
+        .request-info strong {
+            color: #92400e;
+        }
+
+        /* Loading States */
+        .loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: currentColor;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            
+            .container {
+                padding: 20px 15px;
+            }
+            
+            .section {
+                padding: 20px;
+            }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #6b7280;
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="header-left">
+                <div class="logo">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <div>
+                    <h1 class="header-title">SecureRAG</h1>
+                    <div class="user-info" id="userInfo"></div>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="user-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <button class="logout-btn" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Đăng xuất
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="dashboard-grid">
+            <!-- File Upload Section -->
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-icon upload-icon">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                    </div>
+                    <h2 class="section-title">Tải lên Tài liệu</h2>
+                </div>
+                
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label for="file">Chọn File (PDF, DOCX, TXT)</label>
+                        <div class="file-input-wrapper">
+                            <input type="file" id="file" name="file" accept=".pdf,.docx,.txt" required class="file-input">
+                            <div class="file-input-display" id="fileDisplay">
+                                <i class="fas fa-file-upload file-input-icon"></i>
+                                <span class="file-input-text">Kéo thả file hoặc click để chọn</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-upload"></i>
+                        Tải lên File
+                    </button>
+                </form>
+                <div id="uploadMessage"></div>
+            </div>
+            
+            <!-- Search Section -->
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-icon search-icon">
+                        <i class="fas fa-search"></i>
+                    </div>
+                    <h2 class="section-title">Tìm kiếm Tài liệu</h2>
+                </div>
+                
+                <form id="searchForm">
+                    <div class="form-group">
+                        <label for="query">Câu hỏi tìm kiếm</label>
+                        <textarea id="query" name="query" placeholder="Nhập câu hỏi hoặc từ khóa tìm kiếm..." required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i>
+                        Tìm kiếm
+                    </button>
+                </form>
+                <div id="searchResults"></div>
+            </div>
+        </div>
+        
+        <!-- Department Files Section -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-icon files-icon">
+                    <i class="fas fa-folder-open"></i>
+                </div>
+                <h2 class="section-title">Danh sách Tài liệu của Phòng ban</h2>
+            </div>
+            
+            <button onclick="loadDepartmentFiles()" class="btn btn-outline">
+                <i class="fas fa-sync-alt"></i>
+                Làm mới danh sách
+            </button>
+            <div id="fileList" class="file-grid"></div>
+        </div>
+        
+        <!-- Admin Section -->
+        <div class="section admin-section" id="adminSection" style="display: none;">
+            <div class="section-header">
+                <div class="section-icon admin-icon">
+                    <i class="fas fa-user-shield"></i>
+                </div>
+                <h2 class="section-title">Chức năng Admin</h2>
+            </div>
+            
+            <button onclick="viewDeleteRequests()" class="btn btn-warning">
+                <i class="fas fa-clipboard-list"></i>
+                Xem Yêu cầu Xóa
+            </button>
+            <div id="deleteRequests"></div>
+        </div>
+    </div>
+    
+    <script>
+        let currentUser = null;
+        let currentToken = null;
+        
+        // Initialize page
+        window.addEventListener('load', function() {
+            const token = localStorage.getItem('token');
+            const user = localStorage.getItem('user');
+            
+            if (!token || !user) {
+                window.location.href = '/';
+                return;
+            }
+            
+            currentToken = token;
+            currentUser = JSON.parse(user);
+            
+            // Display user info
+            const userRole = currentUser.role === 'admin' ? '👑 Admin' : 
+                           currentUser.role === 'department_user' ? '💼 Nhân viên' : currentUser.role;
+            
+            document.getElementById('userInfo').innerHTML = 
+                `${currentUser.username} • ${currentUser.department} • ${userRole}`;
+            
+            if (currentUser.role === 'admin') {
+                document.getElementById('adminSection').style.display = 'block';
+            }
+
+            loadDepartmentFiles();
+            initializeFileInput();
+        });
+        
+        // Initialize file input with drag & drop
+        function initializeFileInput() {
+            const fileInput = document.getElementById('file');
+            const fileDisplay = document.getElementById('fileDisplay');
+            
+            fileInput.addEventListener('change', function(e) {
+                updateFileDisplay(e.target.files[0]);
+            });
+            
+            // Drag & drop functionality
+            fileDisplay.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                fileDisplay.style.borderColor = '#667eea';
+                fileDisplay.style.background = '#f0f4ff';
+            });
+            
+            fileDisplay.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                fileDisplay.style.borderColor = '#cbd5e0';
+                fileDisplay.style.background = '#f8fafc';
+            });
+            
+            fileDisplay.addEventListener('drop', function(e) {
+                e.preventDefault();
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    fileInput.files = files;
+                    updateFileDisplay(files[0]);
+                }
+                fileDisplay.style.borderColor = '#cbd5e0';
+                fileDisplay.style.background = '#f8fafc';
+            });
+        }
+        
+        function updateFileDisplay(file) {
+            const fileDisplay = document.getElementById('fileDisplay');
+            const fileIcon = fileDisplay.querySelector('.file-input-icon');
+            const fileText = fileDisplay.querySelector('.file-input-text');
+            
+            if (file) {
+                fileDisplay.classList.add('has-file');
+                fileIcon.className = 'fas fa-file-check file-input-icon';
+                fileText.textContent = file.name;
+            } else {
+                fileDisplay.classList.remove('has-file');
+                fileIcon.className = 'fas fa-file-upload file-input-icon';
+                fileText.textContent = 'Kéo thả file hoặc click để chọn';
+            }
+        }
+        
+        // File upload handler
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            const fileInput = document.getElementById('file');
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const messageDiv = document.getElementById('uploadMessage');
+            
+            if (!fileInput.files[0]) {
+                messageDiv.innerHTML = '<div class="message error">Vui lòng chọn file để tải lên.</div>';
+                return;
+            }
+            
+            formData.append('file', fileInput.files[0]);
+            
+            // Show loading state
+            submitBtn.classList.add('loading');
+            submitBtn.innerHTML = '<div class="spinner"></div> Đang tải lên...';
+            messageDiv.innerHTML = '';
+            
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + currentToken
+                    },
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    messageDiv.innerHTML = '<div class="message success"><i class="fas fa-check-circle"></i> ' + result.message + '</div>';
+                    fileInput.value = '';
+                    updateFileDisplay(null);
+                    loadDepartmentFiles();
+                } else {
+                    messageDiv.innerHTML = '<div class="message error"><i class="fas fa-exclamation-circle"></i> ' + result.error + '</div>';
+                }
+            } catch (error) {
+                messageDiv.innerHTML = '<div class="message error"><i class="fas fa-exclamation-circle"></i> Tải lên thất bại: ' + error.message + '</div>';
+            } finally {
+                submitBtn.classList.remove('loading');
+                submitBtn.innerHTML = '<i class="fas fa-upload"></i> Tải lên File';
+            }
+        });
+
+        // Load department files
+        async function loadDepartmentFiles() {
+            const fileListDiv = document.getElementById('fileList');
+            fileListDiv.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><br>Đang tải danh sách...</div>';
+            
+            try {
+                const response = await fetch('/api/files', {
+                    headers: { 'Authorization': 'Bearer ' + currentToken }
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    if (result.files.length === 0) {
+                        fileListDiv.innerHTML = `
+                            <div class="empty-state">
+                                <i class="fas fa-folder-open"></i>
+                                <h3>Chưa có tài liệu nào</h3>
+                                <p>Tải lên tài liệu đầu tiên để bắt đầu sử dụng hệ thống.</p>
+                            </div>`;
+                    } else {
+                        let html = '';
+                        result.files.forEach(file => {
+                            const uploadDate = new Date(file.upload_date).toLocaleDateString('vi-VN');
+                            html += `
+                                <div class="file-card">
+                                    <div class="file-header">
+                                        <div class="file-info">
+                                            <div class="file-name">
+                                                <i class="fas fa-file-alt"></i>
+                                                ${file.filename}
+                                            </div>
+                                            <div class="file-meta">
+                                                ${file.department} • ${file.uploaded_by} • ${uploadDate}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="file-actions">
+                                        <button onclick="downloadFile(${file.id})" class="btn btn-primary">
+                                            <i class="fas fa-download"></i>
+                                            Tải xuống
+                                        </button>
+                                        <button onclick="requestDelete(${file.id})" class="btn btn-danger">
+                                            <i class="fas fa-trash-alt"></i>
+                                            Yêu cầu Xóa
+                                        </button>
+                                    </div>
+                                </div>`;
+                        });
+                        fileListDiv.innerHTML = html;
+                    }
+                } else {
+                    fileListDiv.innerHTML = '<div class="message error"><i class="fas fa-exclamation-circle"></i> ' + result.error + '</div>';
+                }
+            } catch (error) {
+                fileListDiv.innerHTML = '<div class="message error"><i class="fas fa-exclamation-circle"></i> Không thể tải danh sách: ' + error.message + '</div>';
+            }
+        }
+
+        // Download file
+        function downloadFile(fileId) {
+            window.open('/api/download/' + fileId + '?token=' + currentToken, '_blank');
+        }
+
+        // Request delete
+        async function requestDelete(fileId) {
+            if (!confirm('Bạn có chắc chắn muốn yêu cầu xóa file này?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/delete-request', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + currentToken
+                    },
+                    body: JSON.stringify({ file_id: fileId })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    alert('✅ Đã gửi yêu cầu xóa thành công!');
+                } else {
+                    alert('❌ Lỗi: ' + result.error);
+                }
+            } catch (error) {
+                alert('❌ Không thể gửi yêu cầu xóa: ' + error.message);
+            }
+        }
+        
+        // Search handler
+        document.getElementById('searchForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const query = document.getElementById('query').value;
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const resultsDiv = document.getElementById('searchResults');
+            
+            // Show loading state
+            submitBtn.classList.add('loading');
+            submitBtn.innerHTML = '<div class="spinner"></div> Đang tìm kiếm...';
+            resultsDiv.innerHTML = '';
+            
+            try {
+                const response = await fetch('/api/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + currentToken
+                    },
+                    body: JSON.stringify({ query: query })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    let html = '<div class="search-results">';
+                    
+                    // AI Response
+                    html += `
+                        <div class="search-response">
+                            <div class="response-title">
+                                <i class="fas fa-robot"></i>
+                                Phản hồi AI
+                            </div>
+                            <div class="response-content">${result.response}</div>
+                        </div>`;
+                    
+                    // Sources
+                    if (result.sources && result.sources.length > 0) {
+                        html += `
+                            <div class="sources-section">
+                                <div class="sources-title">
+                                    <i class="fas fa-link"></i>
+                                    Nguồn tham khảo (${result.sources.length})
+                                </div>`;
+                        
+                        result.sources.forEach(source => {
+                            const relevancePercent = (source.relevance_score * 100).toFixed(1);
+                            html += `
+                                <div class="source-item">
+                                    <div class="source-info">
+                                        <div class="source-filename">
+                                            <i class="fas fa-file-alt"></i>
+                                            ${source.filename}
+                                        </div>
+                                        <div class="source-department">${source.department}</div>
+                                    </div>
+                                    <div class="relevance-badge">${relevancePercent}%</div>
+                                </div>`;
+                        });
+                        
+                        html += '</div>';
+                    }
+                    
+                    html += '</div>';
+                    resultsDiv.innerHTML = html;
+                } else {
+                    resultsDiv.innerHTML = '<div class="message error"><i class="fas fa-exclamation-circle"></i> ' + result.error + '</div>';
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = '<div class="message error"><i class="fas fa-exclamation-circle"></i> Tìm kiếm thất bại: ' + error.message + '</div>';
+            } finally {
+                submitBtn.classList.remove('loading');
+                submitBtn.innerHTML = '<i class="fas fa-search"></i> Tìm kiếm';
+            }
+        });
+        
+        // Logout function
+        function logout() {
+            if (confirm('Bạn có chắc chắn muốn đăng xuất?')) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '/';
+            }
+        }
+        
+        // Admin functions
+        async function viewDeleteRequests() {
+            const requestsDiv = document.getElementById('deleteRequests');
+            requestsDiv.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><br>Đang tải yêu cầu...</div>';
+            
+            try {
+                const response = await fetch('/api/admin/delete-requests', {
+                    headers: {
+                        'Authorization': 'Bearer ' + currentToken
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    if (result.requests.length === 0) {
+                        requestsDiv.innerHTML = `
+                            <div class="empty-state">
+                                <i class="fas fa-clipboard-list"></i>
+                                <h3>Không có yêu cầu nào đang chờ</h3>
+                                <p>Tất cả yêu cầu xóa đã được xử lý.</p>
+                            </div>`;
+                    } else {
+                        let html = '<div class="admin-requests">';
+                        result.requests.forEach(req => {
+                            const requestDate = new Date(req.request_date).toLocaleDateString('vi-VN');
+                            html += `
+                                <div class="request-card">
+                                    <div class="request-header">
+                                        <div class="request-info">
+                                            <strong>File:</strong> ${req.filename}<br>
+                                            <strong>Yêu cầu bởi:</strong> ${req.requested_by}<br>
+                                            <strong>Ngày:</strong> ${requestDate}
+                                        </div>
+                                    </div>
+                                    <button onclick="approveDelete(${req.id})" class="btn btn-warning">
+                                        <i class="fas fa-check"></i>
+                                        Phê duyệt Xóa
+                                    </button>
+                                </div>`;
+                        });
+                        html += '</div>';
+                        requestsDiv.innerHTML = html;
+                    }
+                } else {
+                    requestsDiv.innerHTML = '<div class="message error"><i class="fas fa-exclamation-circle"></i> ' + result.error + '</div>';
+                }
+            } catch (error) {
+                requestsDiv.innerHTML = '<div class="message error"><i class="fas fa-exclamation-circle"></i> Lỗi tải yêu cầu: ' + error.message + '</div>';
+            }
+        }
+        
+        async function approveDelete(requestId) {
+            if (!confirm('Bạn có chắc chắn muốn phê duyệt xóa file này?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/admin/approve-delete', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + currentToken
+                    },
+                    body: JSON.stringify({ request_id: requestId })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('✅ Yêu cầu xóa đã được phê duyệt thành công!');
+                    viewDeleteRequests();
+                    loadDepartmentFiles();
+                } else {
+                    alert('❌ Lỗi: ' + result.error);
+                }
+            } catch (error) {
+                alert('❌ Lỗi phê duyệt yêu cầu xóa: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>
