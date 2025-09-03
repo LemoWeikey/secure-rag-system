@@ -125,11 +125,11 @@ def download_file(file_id):
 #         raise Exception(f"Loại file không được hỗ trợ: {file_extension}")
 
 # Routes
-@app.route("/")
+@app.route("/health")
 def healthcheck():
     return "OK", 200
 
-@app.route('/login')
+@app.route("/")
 def login_page():
     return render_template("login.html")
 
