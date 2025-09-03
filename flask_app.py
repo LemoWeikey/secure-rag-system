@@ -2,8 +2,8 @@
 from flask import Flask, request, jsonify, render_template, redirect, url_for, session
 from werkzeug.utils import secure_filename
 import os
-import PyPDF2
-import docx2txt
+# import PyPDF2
+# import docx2txt
 from io import BytesIO
 from flask import Flask, request, jsonify, send_file
 from io import BytesIO
@@ -125,7 +125,11 @@ def download_file(file_id):
 #         raise Exception(f"Loại file không được hỗ trợ: {file_extension}")
 
 # Routes
-@app.route('/')
+@app.route("/")
+def healthcheck():
+    return "OK", 200
+
+@app.route('/login')
 def login_page():
     return render_template("login.html")
 
