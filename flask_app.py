@@ -2,8 +2,6 @@
 from flask import Flask, request, jsonify, render_template, redirect, url_for, session
 from werkzeug.utils import secure_filename
 import os
-# import PyPDF2
-# import docx2txt
 from io import BytesIO
 from flask import Flask, request, jsonify, send_file
 from io import BytesIO
@@ -62,7 +60,7 @@ def list_files():
 @app.route("/api/download/<int:file_id>", methods=["GET"])
 def download_file(file_id):
     """Download a file by ID if the user has access."""
-        # Try header first
+    # Try header first
     token = request.headers.get("Authorization", "").replace("Bearer ", "")
     if not token:  
         # Fallback: try query param ?token=...
@@ -84,7 +82,7 @@ def download_file(file_id):
     if not is_admin and file_record.department != department:
         return jsonify({"success": False, "error": "Bạn không có quyền tải file này"}), 403
 
-    # Fetch file bytes from Postgres
+    # Fetch file bytes (from Postgres or local storage)
     file_bytes = rag_system.file_manager.fetch_file_bytes_from_postgres(file_record)
     if not file_bytes:
         return jsonify({"success": False, "error": "Không tìm thấy nội dung file"}), 500
@@ -96,33 +94,6 @@ def download_file(file_id):
         download_name=file_record.filename,
         mimetype="application/octet-stream"
     )
-
-# Helper function to extract text from files
-# def extract_text_from_file(file_content, filename):
-#     """Extract text content from uploaded files"""
-#     file_extension = filename.lower().split('.')[-1]
-    
-#     if file_extension == 'txt':
-#         return file_content.decode('utf-8', errors='ignore')
-    
-#     elif file_extension == 'pdf':
-#         try:
-#             pdf_reader = PyPDF2.PdfReader(BytesIO(file_content))
-#             text = ""
-#             for page in pdf_reader.pages:
-#                 text += page.extract_text()
-#             return text
-#         except Exception as e:
-#             raise Exception(f"Lỗi đọc file PDF: {str(e)}")
-    
-#     elif file_extension == 'docx':
-#         try:
-#             return docx2txt.process(BytesIO(file_content))
-#         except Exception as e:
-#             raise Exception(f"Lỗi đọc file DOCX: {str(e)}")
-    
-#     else:
-#         raise Exception(f"Loại file không được hỗ trợ: {file_extension}")
 
 # Routes
 @app.route("/health")
@@ -155,40 +126,6 @@ def login():
     else:
         return jsonify(result), 401
 
-# @app.route('/api/upload', methods=['POST'])
-# def upload_file():
-#     # Get token from Authorization header or session
-#     auth_header = request.headers.get('Authorization')
-#     if auth_header and auth_header.startswith('Bearer '):
-#         token = auth_header.split(' ')[1]
-#     else:
-#         token = session.get("token")
-    
-#     if not token:
-#         return jsonify({"success": False, "error": "Token xác thực là bắt buộc"}), 401
-    
-#     if 'file' not in request.files:
-#         return jsonify({"success": False, "error": "Chưa có file được cung cấp"}), 400
-    
-#     file = request.files['file']
-#     if file.filename == '':
-#         return jsonify({"success": False, "error": "Chưa chọn file"}), 400
-    
-#     try:
-#         file_content = file.read()
-#         filename = secure_filename(file.filename)
-        
-#         text_content = extract_text_from_file(file_content, filename)
-        
-#         if not text_content.strip():
-#             return jsonify({"success": False, "error": "Không tìm thấy nội dung văn bản trong file"}), 400
-        
-#         result = rag_system.upload_file(token, file_content, filename, text_content)
-        
-#         return jsonify(result), 200 if result["success"] else 400
-        
-#     except Exception as e:
-#         return jsonify({"success": False, "error": str(e)}), 500
 @app.route('/api/upload', methods=['POST'])
 def upload_file():
     # Get token from Authorization header or session
@@ -325,6 +262,7 @@ def approve_delete():
     
     result = rag_system.approve_file_deletion(token, request_id)
     return jsonify(result), 200 if result["success"] else 400
+
 @app.route('/api/admin/create-user', methods=['POST'])
 def create_department_user():
     # Verify admin token
@@ -345,24 +283,47 @@ def create_department_user():
         return jsonify({"success": True, "message": "User created successfully"})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 400
+
 # Create admin user setup (run once)
 def setup_admin_user():
     """Setup initial admin user - run once on first deployment"""
     try:
-        admin_username = os.getenv("ADMIN_USERNAME", "admin")
-        admin_password = os.getenv("ADMIN_PASSWORD", "ChangeThis123!")
+        admin_username = os.getenv("ADMIN_USERNAME")
+        admin_password = os.getenv("ADMIN_PASSWORD")
         
-        rag_system.security_manager.register_user(
+        if not admin_username or not admin_password:
+            print("⚠️  ADMIN_USERNAME and ADMIN_PASSWORD must be set in environment variables")
+            return False
+        
+        # Check if admin already exists
+        conn = sqlite3.connect(rag_system.security_manager.db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT username FROM users WHERE username = ?", (admin_username,))
+        if cursor.fetchone():
+            print(f"ℹ️  Admin user '{admin_username}' already exists")
+            conn.close()
+            return True
+        conn.close()
+        
+        # Create admin user
+        success = rag_system.security_manager.register_user(
             admin_username, 
             "admin_department", 
             admin_password, 
             UserRole.ADMIN
         )
-        print(f"✅ Admin user created: {admin_username}")
-        print("⚠️  IMPORTANT: Change admin password after first login!")
+        
+        if success:
+            print(f"✅ Admin user created: {admin_username}")
+            print("⚠️  IMPORTANT: Change admin password after first login!")
+            return True
+        else:
+            print(f"❌ Failed to create admin user")
+            return False
         
     except Exception as e:
-        print(f"ℹ️  Admin user setup: {e}")
+        print(f"❌ Admin user setup failed: {e}")
+        return False
 
 if __name__ == '__main__':
     # Create necessary directories
@@ -380,5 +341,11 @@ if __name__ == '__main__':
     print("🚀 Starting SecureRAG on Railway...")
     print(f"🌐 Server: {host}:{port}")
     print("📧 Contact admin for account access")
+    
+    # Display database connection status
+    if os.getenv("DATABASE_URL"):
+        print("📊 Database: PostgreSQL configured")
+    else:
+        print("📊 Database: SQLite fallback mode")
     
     app.run(host=host, port=port, debug=debug)

@@ -137,15 +137,40 @@ class SecurityManager:
         conn.commit()
         conn.close()
         
-        # Create default admin user if not exists
-        self.create_default_admin()
+        # Create admin user from environment variables ONLY
+        self.create_admin_from_env()
     
-    def create_default_admin(self):
-        """Create default admin user"""
+    def create_admin_from_env(self):
+        """Create admin user ONLY from environment variables - removes hardcoded fallback"""
+        admin_username = os.getenv("ADMIN_USERNAME")
+        admin_password = os.getenv("ADMIN_PASSWORD")
+        
+        if not admin_username or not admin_password:
+            print("⚠️  WARNING: ADMIN_USERNAME or ADMIN_PASSWORD not set in environment")
+            print("   Admin user will not be created automatically")
+            return
+            
         try:
-            self.register_user("admin", "admin", "admin123", UserRole.ADMIN)
-        except:
-            pass  # Admin already exists
+            # Check if admin already exists
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT username FROM users WHERE username = ?", (admin_username,))
+            if cursor.fetchone():
+                print(f"ℹ️  Admin user '{admin_username}' already exists")
+                conn.close()
+                return
+            conn.close()
+            
+            # Create new admin
+            success = self.register_user(admin_username, "admin_department", admin_password, UserRole.ADMIN)
+            if success:
+                print(f"✅ Admin user created: {admin_username}")
+                print("⚠️  IMPORTANT: Change admin password after first login!")
+            else:
+                print(f"❌ Failed to create admin user: {admin_username}")
+                
+        except Exception as e:
+            print(f"❌ Admin user creation error: {e}")
     
     def hash_password(self, password: str) -> str:
         """Hash password using SHA-256"""
@@ -229,18 +254,33 @@ class PGFile(BasePG):
 
 # DB bootstrap for Postgres (engine created from env)
 DATABASE_URL = os.getenv("DATABASE_URL", None)
-if not DATABASE_URL:
-    # For safety: don't crash on import, but warn and set to None
-    print("[WARN] DATABASE_URL not set — Postgres file storage will be disabled.")
-else:
-    engine_pg = create_engine(DATABASE_URL, pool_pre_ping=True)
-    SessionPG = sessionmaker(bind=engine_pg)
+engine_pg = None
+SessionPG = None
+
+if DATABASE_URL:
     try:
+        # Handle Railway's postgres:// URLs by converting to postgresql://
+        if DATABASE_URL.startswith("postgres://"):
+            DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+            
+        engine_pg = create_engine(DATABASE_URL, pool_pre_ping=True)
+        SessionPG = sessionmaker(bind=engine_pg)
+        
+        # Test connection
+        with engine_pg.connect() as conn:
+            conn.execute("SELECT 1")
+        
+        # Create tables
         BasePG.metadata.create_all(bind=engine_pg)
+        print(f"✅ Connected to PostgreSQL database successfully")
+        
     except Exception as e:
-        print(f"[WARN] Could not create Postgres tables: {e}")
+        print(f"❌ PostgreSQL connection failed: {e}")
+        print("   File storage will fall back to local SQLite")
         engine_pg = None
         SessionPG = None
+else:
+    print("⚠️  DATABASE_URL not set — using SQLite for file storage")
 
 class FileManager:
     """
@@ -254,36 +294,59 @@ class FileManager:
         # security_manager still used for SQLite operations (users, delete_requests, old 'files' metadata)
         self.security_manager = security_manager
         self.base_path = base_path  # not used for storage now, kept for compatibility
+        os.makedirs(base_path, exist_ok=True)  # Create fallback directory
 
     def save_file(self, file_content: bytes, filename: str, department: str, username: str) -> int:
         """
         Save file bytes to Postgres and metadata to SQLite.
+        Falls back to local file storage if Postgres unavailable.
         """
         if not file_content:
             raise ValueError("Uploaded file is empty!")
 
-        # --- 1) Save raw file into Postgres ---
+        # --- 1) Try saving to Postgres first ---
         pg_id = None
-        if DATABASE_URL and SessionPG:
-            session_pg = SessionPG()
-            pg_row = PGFile(
-                filename=filename,
-                department=department,
-                uploaded_by=username,
-                content=file_content,  # ✅ bytes directly here
-                status="active"
-            )
-            session_pg.add(pg_row)
-            session_pg.commit()
-            session_pg.refresh(pg_row)
-            pg_id = int(pg_row.id)
-            session_pg.close()
-            print(f"[DEBUG] Stored bytes in Postgres files_pg id={pg_id}")
+        file_path_val = ""
         
-        # --- 2) Save metadata into SQLite ---
+        if DATABASE_URL and SessionPG and engine_pg:
+            try:
+                session_pg = SessionPG()
+                pg_row = PGFile(
+                    filename=filename,
+                    department=department,
+                    uploaded_by=username,
+                    content=file_content,  # ✅ bytes directly here
+                    status="active"
+                )
+                session_pg.add(pg_row)
+                session_pg.commit()
+                session_pg.refresh(pg_row)
+                pg_id = int(pg_row.id)
+                session_pg.close()
+                file_path_val = f"pg:{pg_id}"
+                print(f"[DEBUG] Stored bytes in Postgres files_pg id={pg_id}")
+            except Exception as e:
+                print(f"[ERROR] Postgres save failed: {e}, falling back to local storage")
+        
+        # --- 2) Fallback to local file storage if Postgres failed ---
+        if not file_path_val:
+            try:
+                # Generate unique filename
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                safe_filename = f"{timestamp}_{filename}"
+                local_path = os.path.join(self.base_path, safe_filename)
+                
+                with open(local_path, 'wb') as f:
+                    f.write(file_content)
+                
+                file_path_val = f"local:{safe_filename}"
+                print(f"[DEBUG] Stored file locally: {local_path}")
+            except Exception as e:
+                raise Exception(f"Both Postgres and local storage failed: {e}")
+        
+        # --- 3) Save metadata into SQLite ---
         conn = sqlite3.connect(self.security_manager.db_path)
         cursor = conn.cursor()
-        file_path_val = f"pg:{pg_id}" if pg_id is not None else ""
         cursor.execute('''
             INSERT INTO files (filename, department, uploaded_by, file_path, vector_ids)
             VALUES (?, ?, ?, ?, ?)
@@ -294,10 +357,11 @@ class FileManager:
         print(f"[DEBUG] Created SQLite files record id={file_record_id} (file_path={file_path_val})")
 
         return file_record_id
+
     def get_file_record(self, file_id: int) -> Optional[FileRecord]:
         """
         Return a FileRecord dataclass (like the old implementation),
-        populated from SQLite `files` metadata. The file_path field will contain the mapping 'pg:<pg_id>' if saved to Postgres.
+        populated from SQLite `files` metadata. The file_path field will contain the mapping 'pg:<pg_id>' or 'local:<filename>' if saved locally.
         """
         conn = sqlite3.connect(self.security_manager.db_path)
         cursor = conn.cursor()
@@ -320,27 +384,45 @@ class FileManager:
                 upload_date=upload_date,
                 status=FileStatus(result[5]) if result[5] in FileStatus._value2member_map_ else FileStatus.ACTIVE,
                 vector_ids=pg_vector_ids,
-                file_path=result[7]  # contains "pg:<pg_id>" or legacy path
+                file_path=result[7]  # contains "pg:<pg_id>" or "local:<filename>"
             )
         return None
 
     def fetch_file_bytes_from_postgres(self, sqlite_file_record: FileRecord) -> Optional[bytes]:
         """
-        Given a FileRecord (from get_file_record), return the raw bytes from Postgres (if present).
+        Given a FileRecord (from get_file_record), return the raw bytes from Postgres or local storage.
         """
         try:
             file_path = sqlite_file_record.file_path or ""
-            if not file_path.startswith("pg:"):
+            
+            # Handle Postgres storage
+            if file_path.startswith("pg:"):
+                pg_id = int(file_path.split(":", 1)[1])
+                if not SessionPG:
+                    print("[ERROR] SessionPG not available for pg: file")
+                    return None
+                session_pg = SessionPG()
+                pg_row = session_pg.query(PGFile).filter(PGFile.id == pg_id).first()
+                session_pg.close()
+                if not pg_row:
+                    print(f"[ERROR] No Postgres record found for pg_id={pg_id}")
+                    return None
+                return bytes(pg_row.content)
+            
+            # Handle local storage
+            elif file_path.startswith("local:"):
+                local_filename = file_path.split(":", 1)[1]
+                local_path = os.path.join(self.base_path, local_filename)
+                if not os.path.exists(local_path):
+                    print(f"[ERROR] Local file not found: {local_path}")
+                    return None
+                with open(local_path, 'rb') as f:
+                    return f.read()
+            
+            else:
+                print(f"[ERROR] Unsupported file_path format: {file_path}")
                 return None
-            pg_id = int(file_path.split(":", 1)[1])
-            if not SessionPG:
-                return None
-            session_pg = SessionPG()
-            pg_row = session_pg.query(PGFile).filter(PGFile.id == pg_id).first()
-            session_pg.close()
-            if not pg_row:
-                return None
-            return bytes(pg_row.content)
+                
         except Exception as e:
             print(f"[ERROR] fetch_file_bytes_from_postgres failed: {e}")
             return None
@@ -389,7 +471,7 @@ class FileManager:
     def approve_deletion(self, request_id: int, admin_username: str) -> bool:
         """
         Mark SQLite files row as deleted and mark the delete_request approved.
-        If the SQLite file has a 'pg:<pg_id>' mapping, also delete the Postgres bytes row.
+        Delete from both Postgres and local storage as appropriate.
         """
         conn = sqlite3.connect(self.security_manager.db_path)
         cursor = conn.cursor()
@@ -403,6 +485,9 @@ class FileManager:
                 return False
             file_id = rr[0]
 
+            # Get file record before deletion
+            rec = self.get_file_record(file_id)
+            
             # Update SQLite files status
             cursor.execute('''
                 UPDATE files SET status = 'deleted' WHERE id = ?
@@ -416,19 +501,30 @@ class FileManager:
 
             conn.commit()
 
-            # Try deleting from Postgres if mapping exists
-            rec = self.get_file_record(file_id)
-            if rec and rec.file_path and rec.file_path.startswith("pg:") and SessionPG:
-                pg_id = int(rec.file_path.split(":", 1)[1])
-                try:
-                    session_pg = SessionPG()
-                    pg_row = session_pg.query(PGFile).filter(PGFile.id == pg_id).first()
-                    if pg_row:
-                        session_pg.delete(pg_row)
-                        session_pg.commit()
-                    session_pg.close()
-                except Exception as e:
-                    print(f"[WARN] Could not delete PG file id={pg_id}: {e}")
+            # Delete actual file content
+            if rec and rec.file_path:
+                if rec.file_path.startswith("pg:") and SessionPG:
+                    # Delete from Postgres
+                    try:
+                        pg_id = int(rec.file_path.split(":", 1)[1])
+                        session_pg = SessionPG()
+                        pg_row = session_pg.query(PGFile).filter(PGFile.id == pg_id).first()
+                        if pg_row:
+                            session_pg.delete(pg_row)
+                            session_pg.commit()
+                        session_pg.close()
+                    except Exception as e:
+                        print(f"[WARN] Could not delete PG file id={pg_id}: {e}")
+                
+                elif rec.file_path.startswith("local:"):
+                    # Delete from local storage
+                    try:
+                        local_filename = rec.file_path.split(":", 1)[1]
+                        local_path = os.path.join(self.base_path, local_filename)
+                        if os.path.exists(local_path):
+                            os.remove(local_path)
+                    except Exception as e:
+                        print(f"[WARN] Could not delete local file: {e}")
 
             return True
         except Exception as e:
@@ -438,8 +534,6 @@ class FileManager:
         finally:
             conn.close()
 # ------------------------------------------------------------------------------------------------------
-
-
 
 class SearchResult:
     def __init__(self, content, source, relevance_score, department, file_id=None):
@@ -486,35 +580,6 @@ class ActiveLoopRAG:
             print(f"[ERROR] Embedding generation failed: {e}")
             return []
 
-    # --- Add documents ---
-    # def add_document(self, text: str, department: str, file_id: int, filename: str):
-    #     # if department not in self.vector_stores:
-    #     #     print(f"[ERROR] Department {department} not found")
-    #     #     return
-        
-    #     # embedding = self.get_embedding(text)
-    #     # if not embedding:
-    #     #     return
-        
-    #     # metadata = {
-    #     #     "file_id": file_id,
-    #     #     "filename": filename,
-    #     #     "department": department,
-    #     #     "timestamp": datetime.now().isoformat()
-    #     # }
-        
-    #     # try:
-    #     #     with self.vector_stores[department]:
-    #     #         self.vector_stores[department].append({
-    #     #             "text": text,
-    #     #             "embedding": embedding,
-    #     #             "metadata": metadata
-    #     #         })
-    #     #     print(f"[DEBUG] Added document '{filename}' to {department}")
-    #     # except Exception as e:
-    #     #     print(f"[ERROR] Failed to add document: {e}")
-    #     print("[INFO] add_document disabled — uploads are stored only in Postgres/SQLite.")
-    #     return []
     # --- Search ---
     def search_department(self, query: str, department: str, k: int = 5) -> List[SearchResult]:
         if department not in self.vector_stores:
@@ -635,31 +700,8 @@ class SecureRAGSystem:
             }
         return {"success": False, "error": "Thông tin đăng nhập không hợp lệ"}
     
-    # def upload_file(self, token: str, file_content: bytes, filename: str, text_content: str) -> Dict:
-    #     """Upload file (only saves in Postgres + SQLite, not DeepLake)."""
-    #     payload = self.security_manager.verify_token(token)
-    #     if not payload:
-    #         return {"success": False, "error": "Token không hợp lệ"}
-        
-    #     department = payload['department']
-    #     username = payload['username']
-        
-    #     try:
-    #         # Save file only
-    #         file_id = self.file_manager.save_file(file_content, filename, department, username)
-            
-    #         # No DeepLake push
-    #         return {
-    #             "success": True,
-    #             "file_id": file_id,
-    #             "message": f"Tải file '{filename}' thành công vào phòng ban {department}"
-    #         }
-    #     except Exception as e:
-    #         return {"success": False, "error": f"Lỗi: {str(e)}"}
-
-    
     def upload_file(self, token: str, file_content: bytes, filename: str, text_content: Optional[str] = None) -> Dict:
-        """Upload file (only saves in Postgres + SQLite, not DeepLake)."""
+        """Upload file (saves in Postgres/local + SQLite, not DeepLake)."""
         payload = self.security_manager.verify_token(token)
         if not payload:
             return {"success": False, "error": "Token không hợp lệ"}
@@ -679,6 +721,7 @@ class SecureRAGSystem:
             }
         except Exception as e:
             return {"success": False, "error": f"Lỗi: {str(e)}"}
+
     def search(self, token: str, query: str) -> Dict:
         payload = self.security_manager.verify_token(token)
         if not payload:
@@ -746,13 +789,6 @@ class SecureRAGSystem:
         # Approve deletion
         success = self.file_manager.approve_deletion(request_id, payload['username'])
         if success:
-            # Delete from ActiveLoop vector stores
-            file_record = self.file_manager.get_file_record(file_id)
-            if file_record and file_record.vector_ids:
-                self.rag_system.delete_document_from_vectorstore(
-                    file_record.vector_ids, 
-                    file_record.department
-                )
             return {"success": True, "message": "File đã được xóa thành công"}
         
         return {"success": False, "error": "Không thể phê duyệt xóa file"}
