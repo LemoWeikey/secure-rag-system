@@ -454,59 +454,7 @@ class SecurityManager:
         
         return permissions.get(role, permissions["employee"])
 
-    # ADD THESE METHODS TO YOUR SecureRAGSystem CLASS
-
-    def create_employee_with_details(self, token: str, username: str, password: str, employee_name: str = "") -> Dict:
-        """Department head or admin creates employee with additional details"""
-        payload = self.security_manager.verify_token(token)
-        if not payload:
-            return {"success": False, "error": "Token không hợp lệ"}
-        
-        # Admin can create employees in any department
-        # Department heads can only create employees in their department
-        if payload['role'] not in ['admin', 'department_head']:
-            return {"success": False, "error": "Không có quyền tạo nhân viên"}
-        
-        department = payload['department']
-        
-        # For admin, they might specify department, otherwise use their department
-        if payload['role'] == 'admin' and 'target_department' in payload:
-            department = payload['target_department']
-        
-        success = self.security_manager.register_user_with_details(
-            username, department, password, UserRole.EMPLOYEE, payload['username'], employee_name
-        )
-        
-        if success:
-            return {
-                "success": True, 
-                "message": f"Tạo tài khoản nhân viên {username} thành công trong phòng ban {department}",
-                "employee": {
-                    "username": username,
-                    "department": department,
-                    "role": "employee",
-                    "created_by": payload['username']
-                }
-            }
-        return {"success": False, "error": "Không thể tạo tài khoản nhân viên. Tên đăng nhập có thể đã tồn tại."}
-
-    def get_department_employees(self, token: str) -> Dict:
-        """Get all employees in the same department (for department heads and admins)"""
-        payload = self.security_manager.verify_token(token)
-        if not payload:
-            return {"success": False, "error": "Token không hợp lệ"}
-        
-        if payload['role'] not in ['admin', 'department_head']:
-            return {"success": False, "error": "Không có quyền xem danh sách nhân viên"}
-        
-        department = payload['department']
-        employees = self.security_manager.get_employees_in_department(department)
-        
-        return {
-            "success": True, 
-            "employees": employees,
-            "department": department
-        }    
+    
 # PostgreSQL setup (same as before)
 BasePG = declarative_base()
 
@@ -1161,7 +1109,59 @@ class SecureRAGSystem:
         
         users = self.security_manager.get_users_in_department(target_department)
         return {"success": True, "users": users, "department": target_department}
+    # ADD THESE METHODS TO YOUR SecureRAGSystem CLASS
 
+    def create_employee_with_details(self, token: str, username: str, password: str, employee_name: str = "") -> Dict:
+        """Department head or admin creates employee with additional details"""
+        payload = self.security_manager.verify_token(token)
+        if not payload:
+            return {"success": False, "error": "Token không hợp lệ"}
+        
+        # Admin can create employees in any department
+        # Department heads can only create employees in their department
+        if payload['role'] not in ['admin', 'department_head']:
+            return {"success": False, "error": "Không có quyền tạo nhân viên"}
+        
+        department = payload['department']
+        
+        # For admin, they might specify department, otherwise use their department
+        if payload['role'] == 'admin' and 'target_department' in payload:
+            department = payload['target_department']
+        
+        success = self.security_manager.register_user_with_details(
+            username, department, password, UserRole.EMPLOYEE, payload['username'], employee_name
+        )
+        
+        if success:
+            return {
+                "success": True, 
+                "message": f"Tạo tài khoản nhân viên {username} thành công trong phòng ban {department}",
+                "employee": {
+                    "username": username,
+                    "department": department,
+                    "role": "employee",
+                    "created_by": payload['username']
+                }
+            }
+        return {"success": False, "error": "Không thể tạo tài khoản nhân viên. Tên đăng nhập có thể đã tồn tại."}
+
+    def get_department_employees(self, token: str) -> Dict:
+        """Get all employees in the same department (for department heads and admins)"""
+        payload = self.security_manager.verify_token(token)
+        if not payload:
+            return {"success": False, "error": "Token không hợp lệ"}
+        
+        if payload['role'] not in ['admin', 'department_head']:
+            return {"success": False, "error": "Không có quyền xem danh sách nhân viên"}
+        
+        department = payload['department']
+        employees = self.security_manager.get_employees_in_department(department)
+        
+        return {
+            "success": True, 
+            "employees": employees,
+            "department": department
+        }    
 # Example usage and setup
 if __name__ == "__main__":
     rag_system = SecureRAGSystem()
@@ -1187,3 +1187,8 @@ if __name__ == "__main__":
         rag_system.create_employee(head_token, "marketing_emp2", "emp_password123")
         
         print("Marketing employees created successfully")
+
+
+
+
+        
